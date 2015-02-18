@@ -24,6 +24,10 @@
     .terms-legend {
       display: table-row;
     }
+
+    .weighted-terms-message {
+      margin: 10px 5px 10px 0;
+    }
   </style>
 
 
@@ -51,8 +55,11 @@
     <!-- keep legend from over lapping -->
     <div style="clear:both"></div>
 
+    <div class="row-fluid panel-extra"><span class="weighted-terms-message" ng-repeat="message in weights_message" ng-bind-html-unsafe="message"></span> </div>
+    <div style="clear:both"></div>
+
     <!-- CHART -->
-    <div ng-show="panel.chart == 'pie' || panel.chart == 'bar'" terms-chart params="{{panel}}" style="position:relative" class="pointer terms-chart">
+    <div ng-show="panel.chart == 'pie' || panel.chart == 'bar'" weightedterms-chart params="{{panel}}" style="position:relative" class="pointer weightedterms-chart">
     </div>
 
     <!-- LEGEND -->

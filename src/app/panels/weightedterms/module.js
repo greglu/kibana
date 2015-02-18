@@ -45,12 +45,6 @@ function (angular, app, _, $, kbn) {
     // Set and populate defaults
     var _d = {
       /** @scratch /panels/weightedterms/5
-       * === Parameters
-       *
-       * field:: The field on which to computer the facet
-       */
-      field   : '_type',
-      /** @scratch /panels/weightedterms/5
        * filter:: regex string for filtering term values
        */
       filter : '',
@@ -127,6 +121,7 @@ function (angular, app, _, $, kbn) {
 
     $scope.get_weights = function() {
       var weightsFileDef = $q.defer();
+      $scope.weights_message = [];
 
       var weights = $scope.panel.weights;
       if (_.isString(weights)) {
@@ -134,13 +129,13 @@ function (angular, app, _, $, kbn) {
           var parsedWeights = JSON.parse(weights);
           if (_.isObject(parsedWeights)) {
             $scope.panel.weighted_terms = parsedWeights;
-            alertSrv.set($scope.panel.title, 'panel using manually configured weights', 'info');
+            $scope.weights_message.push('Using manually configured weights.');
             weightsFileDef.resolve();
-            console.log($scope.panel.weighted_terms);
             return weightsFileDef.promise;
           }
         } catch (e) {
-          alertSrv.set($scope.panel.title, 'panel unable to parse manually defined weights.', 'error', 5000);
+          alertSrv.set($scope.panel.title, 'panel unable to parse manually configured weights from JSON.', 'error', 10000);
+          $scope.weights_message.push('Unable to parse manually configured weights from JSON.');
         }
       }
 
@@ -150,13 +145,14 @@ function (angular, app, _, $, kbn) {
           $scope.panel.weighted_terms = {};
           alertSrv.set($scope.panel.title, 'panel unable to load from: ' + weightsFileUrl +
               ' so continuing without weights.', 'error');
+          $scope.weights_message.push('Unable to load from ' + weightsFileUrl + ' so continuing without weights.');
           weightsFileDef.reject();
         }
 
         $http.get(weightsFileUrl, { responseType: 'json' })
           .success(function(data) {
             if (data) {
-              alertSrv.set($scope.panel.title, 'panel using weights loaded from: <a href="' + weightsFileUrl + '">' + weightsFileUrl + '</a>', 'info');
+              $scope.weights_message.push('Using weights loaded from <a href="' + weightsFileUrl + '" target="_blank">' + weightsFileUrl + '</a>.');
               $scope.panel.weighted_terms = data;
               weightsFileDef.resolve();
             } else {
@@ -187,8 +183,8 @@ function (angular, app, _, $, kbn) {
         boolQuery,
         queries;
 
-      $scope.field = _.contains(fields.list,$scope.panel.field+'.raw') ?
-        $scope.panel.field+'.raw' : $scope.panel.field;
+      $scope.field = _.contains(fields.list, $scope.panel.agg_field_1+'.raw') ?
+        $scope.panel.agg_field_1+'.raw' : $scope.panel.agg_field_1;
 
       request = $scope.ejs.Request().indices(dashboard.indices);
 
@@ -293,7 +289,7 @@ function (angular, app, _, $, kbn) {
 
   });
 
-  module.directive('termsChart', function(querySrv) {
+  module.directive('weightedtermsChart', function(querySrv) {
     return {
       restrict: 'A',
       link: function(scope, elem) {
@@ -314,7 +310,7 @@ function (angular, app, _, $, kbn) {
               weight = 1.0;
             }
             var weightedValue = Math.floor(weight * value);
-            console.log('Adjusting ' + key + ' doc_count of ' + value + ' by ' + weight + 'x')
+            console.log('Adjusting ' + key + ' value of ' + value + ' by ' + weight + 'x')
             return weightedValue;
           }
           return value;
