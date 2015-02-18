@@ -31,7 +31,7 @@
       <h5>Weights File URL</h5>
       <label class="small">Define a URL path for loading in a weight file in JSON format.</label>
       <div class="editor-option">
-        <input type="text" ng-model='panel.weights_file_url'></input>
+        <input type="text" ng-model='panel.weights_file_url' ng-change="set_refresh(true)"></input>
       </div>
     </div>
   </div>
