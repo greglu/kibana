@@ -58,12 +58,12 @@ function (angular, app, _, $, kbn) {
        * missing:: Set to false to disable the display of a counter showing how much results are
        * missing the field
        */
-      missing : true,
+      missing : false,
       /** @scratch /panels/weightedterms/5
        * other:: Set to false to disable the display of a counter representing the aggregate of all
        * values outside of the scope of your +size+ property
        */
-      other   : true,
+      other   : false,
       /** @scratch /panels/weightedterms/5
        * size:: Show this many terms
        */
@@ -126,9 +126,25 @@ function (angular, app, _, $, kbn) {
     };
 
     $scope.get_weights = function() {
-      var weightsFileUrl = $scope.panel.weights_file_url;
       var weightsFileDef = $q.defer();
 
+      var weights = $scope.panel.weights;
+      if (_.isString(weights)) {
+        try {
+          var parsedWeights = JSON.parse(weights);
+          if (_.isObject(parsedWeights)) {
+            $scope.panel.weighted_terms = parsedWeights;
+            alertSrv.set($scope.panel.title, 'panel using manually configured weights', 'info');
+            weightsFileDef.resolve();
+            console.log($scope.panel.weighted_terms);
+            return weightsFileDef.promise;
+          }
+        } catch (e) {
+          alertSrv.set($scope.panel.title, 'panel unable to parse manually defined weights.', 'error', 5000);
+        }
+      }
+
+      var weightsFileUrl = $scope.panel.weights_file_url;
       if (weightsFileUrl) {
         var errorDefaultWeights = function() {
           $scope.panel.weighted_terms = {};
@@ -140,7 +156,7 @@ function (angular, app, _, $, kbn) {
         $http.get(weightsFileUrl, { responseType: 'json' })
           .success(function(data) {
             if (data) {
-              alertSrv.set($scope.panel.title, 'panel using weights loaded from: ' + weightsFileUrl, 'info');
+              alertSrv.set($scope.panel.title, 'panel using weights loaded from: <a href="' + weightsFileUrl + '">' + weightsFileUrl + '</a>', 'info');
               $scope.panel.weighted_terms = data;
               weightsFileDef.resolve();
             } else {
@@ -256,7 +272,7 @@ function (angular, app, _, $, kbn) {
 
     $scope.close_edit = function() {
       if($scope.refresh) {
-        $scope.get_data();
+        $scope.get_weights().always($scope.get_data);
       }
       $scope.refresh =  false;
       $scope.$emit('render');
@@ -288,28 +304,63 @@ function (angular, app, _, $, kbn) {
           render_panel();
         });
 
-        function build_results() {
-          // Collect the weighted counts for each term
-          var weightedData = [];
-          _.each(scope.results.aggregations['weightedterms'][scope.panel.agg_field_1]['buckets'], function(agg) {
-            var key = agg['key'],
-                count;
-
-            if (_.has(scope.panel.weighted_terms, key)) {
-              var weight = (scope.panel.weighted_terms[key] || 1.0);
-              count = weight * agg['doc_count'];
-              console.log('Adjusting ' + key + ' doc_count ' + agg['doc_count'] + ' by ' + weight + 'x')
-            } else {
-              count = agg['doc_count'];
+        // For a given string key, look it up in the panel's general
+        // weighted_terms table, and if it exists, adjust the
+        // given value by the weight.
+        function weighted_value(key, value) {
+          if (_.has(scope.panel.weighted_terms, key)) {
+            var weight = scope.panel.weighted_terms[key];
+            if (!_.isNumber(weight)) {
+              weight = 1.0;
             }
+            var weightedValue = Math.floor(weight * value);
+            console.log('Adjusting ' + key + ' doc_count of ' + value + ' by ' + weight + 'x')
+            return weightedValue;
+          }
+          return value;
+        }
 
+        // Given an ES aggregation bucket, iterate through the entries and
+        // collect their weighted doc counts
+        function collect_bucket_doc_counts(buckets) {
+          var weightedData = [];
+          _.each(buckets, function(item) {
+            var key = item.key;
+            var count = weighted_value(key, item.doc_count)
             weightedData.push({ key: key, count: count });
           });
+          return weightedData;
+        }
+
+        function build_results() {
+          var weightedData;
+          var aggField1 = scope.results.aggregations['weightedterms'][scope.panel.agg_field_1];
+
+          if (scope.panel.agg_field_2) {
+            // If there's a subaggregation, we need to grab the weighted counts
+            // in there first, then sum them up at the top level aggregation.
+            weightedData = [];
+
+            _.each(aggField1.buckets, function(agg1) {
+              var agg1Entries = collect_bucket_doc_counts(agg1[scope.panel.agg_field_2].buckets);
+
+              var weightedSum = 0;
+              _.each(agg1Entries, function(weightedCount) {
+                weightedSum += weightedCount.count;
+              });
+              weightedSum = weighted_value(agg1.key, weightedSum);
+
+              weightedData.push({ key: agg1.key, count: weightedSum });
+            });
+          } else {
+            // Without a subaggregation, we can just collect the weighted
+            // counts from the top level aggregation.
+            weightedData = collect_bucket_doc_counts(aggField1['buckets']);
+          }
 
           // Now sort them and transform into plot format
           var k = 0;
           scope.data = [];
-
           _.each(_.sortBy(weightedData, 'count').reverse(), function(v) {
             scope.data.push({ label: v.key, data: [[k, v.count]], actions: true });
             k = k + 1;

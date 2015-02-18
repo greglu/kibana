@@ -1,13 +1,5 @@
   <div class="editor-row">
     <div class="section">
-      <h5>Weights File URL</h5>
-      <div class="editor-option">
-        <input type="text" ng-model='panel.weights_file_url'></input>
-      </div>
-    </div>
-  </div>
-  <div class="editor-row">
-    <div class="section">
       <h5>Parameters</h5>
       <div class="editor-option">
         <label class="small">Aggregation Field</label>
@@ -29,6 +21,22 @@
   </div>
   <div class="editor-row">
     <div class="section">
+      <h5>Weights</h5>
+      <label class="small">Define the weight directly in the panel, in JSON format. If this, and the "Weights File URL" are both defined, this value is used instead. This will also fall back to loading the URL if invalid JSON was given.</label>
+      <textarea class="input-block-level" rows="10" ng-model='panel.weights' ng-change="set_refresh(true)"></textarea>
+    </div>
+  </div>
+  <div class="editor-row">
+    <div class="section">
+      <h5>Weights File URL</h5>
+      <label class="small">Define a URL path for loading in a weight file in JSON format.</label>
+      <div class="editor-option">
+        <input type="text" ng-model='panel.weights_file_url'></input>
+      </div>
+    </div>
+  </div>
+  <div class="editor-row">
+    <div class="section">
       <h5>View Options</h5>
       <div class="editor-option">
         <label class="small">Style</label>
@@ -45,12 +53,6 @@
       <div class="editor-option" ng-show="panel.chart != 'table' && panel.counter_pos != 'none'">
         <label class="small" >Legend Format</label>
         <select class="input-small" ng-model="panel.arrangement" ng-options="f for f in ['horizontal','vertical']"></select></span>
-      </div>
-      <div class="editor-option">
-        <label class="small">Missing</label><input type="checkbox" ng-model="panel.missing" ng-checked="panel.missing">
-      </div>
-      <div class="editor-option">
-        <label class="small">Other</label><input type="checkbox" ng-model="panel.other" ng-checked="panel.other">
       </div>
       <div class="editor-option" ng-show="panel.chart == 'pie'">
         <label class="small">Donut</label><input type="checkbox" ng-model="panel.donut" ng-checked="panel.donut">
